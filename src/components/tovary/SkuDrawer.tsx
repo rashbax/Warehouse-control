@@ -20,6 +20,7 @@ type Details = {
   artikul: string;
   model: string;
   color: string;
+  honestSign: string | null;
   imageUrl: string | null;
   note: string | null;
   stock: number;
@@ -146,6 +147,11 @@ export default function SkuDrawer({ skuId, onClose, onEditClick, onDeleteClick }
                 <p className="text-sm font-mono font-semibold text-slate-800">{details.artikul}</p>
                 <p className="text-sm text-slate-700 mt-0.5">{details.model}</p>
                 <p className="text-sm text-slate-500">{details.color}</p>
+                {details.honestSign && (
+                  <p className="text-xs text-slate-500 mt-1 font-mono" title="Честный знак">
+                    ЧЗ: {details.honestSign}
+                  </p>
+                )}
                 {details.note && <p className="text-xs text-slate-400 mt-1 italic">{details.note}</p>}
                 <div className="mt-2">
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-semibold ${

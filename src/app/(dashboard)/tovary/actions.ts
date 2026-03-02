@@ -1,13 +1,20 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 import { createServiceClient, STORAGE_BUCKET } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
+const ALLOWED_MARKETPLACES = ["Wildberries", "Ozon", "Uzum Market", "Yandex Market", "Другое"];
 
 export async function createSku(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
   const artikul = (formData.get("artikul") as string).trim();
   const model = (formData.get("model") as string).trim();
   const color = (formData.get("color") as string).trim();
+  const honestSign = (formData.get("honestSign") as string)?.trim() || "";
   const note = (formData.get("note") as string).trim();
   const imageFile = formData.get("image") as File | null;
 
@@ -22,6 +29,7 @@ export async function createSku(formData: FormData) {
         artikul,
         model,
         color,
+        honestSign: honestSign || undefined,
         note: note || undefined,
         imageUrl,
       },
@@ -37,8 +45,12 @@ export async function createSku(formData: FormData) {
 }
 
 export async function updateSku(id: string, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
   const model = (formData.get("model") as string).trim();
   const color = (formData.get("color") as string).trim();
+  const honestSign = (formData.get("honestSign") as string)?.trim() || "";
   const note = (formData.get("note") as string).trim();
   const imageFile = formData.get("image") as File | null;
 
@@ -52,6 +64,7 @@ export async function updateSku(id: string, formData: FormData) {
     data: {
       model,
       color,
+      honestSign: honestSign || null,
       note: note || undefined,
       ...(imageUrl ? { imageUrl } : {}),
     },
@@ -61,9 +74,14 @@ export async function updateSku(id: string, formData: FormData) {
 }
 
 export async function deleteSku(id: string) {
-  // Delete related operations first to avoid FK constraint
-  await prisma.operation.deleteMany({ where: { skuId: id } });
-  await prisma.sKU.delete({ where: { id } });
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  await prisma.$transaction([
+    prisma.operation.deleteMany({ where: { skuId: id } }),
+    prisma.sKU.delete({ where: { id } }),
+  ]);
+
   revalidatePath("/tovary");
   revalidatePath("/ostatki");
   revalidatePath("/istoriya");
@@ -77,6 +95,7 @@ export async function getSkuDetails(id: string) {
       artikul: true,
       model: true,
       color: true,
+      honestSign: true,
       imageUrl: true,
       note: true,
       operations: {
@@ -96,9 +115,7 @@ export async function getSkuDetails(id: string) {
   });
   if (!sku) throw new Error("SKU не найден");
 
-  const stock = sku.operations.reduce((acc, op) => {
-    return op.type === "PRIHOD" ? acc + op.qty : acc - op.qty;
-  }, 0);
+  const stock = await getStockBalance(id);
 
   return {
     ...sku,
@@ -112,11 +129,9 @@ export async function getSkuDetails(id: string) {
 }
 
 export async function quickPrihod(skuId: string, formData: FormData) {
-  const { auth } = await import("@/lib/auth");
-  const { redirect } = await import("next/navigation");
   const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) redirect("/login");
+  if (!session?.user?.id) redirect("/login");
+  const userId = session.user.id;
 
   const qty = parseInt(formData.get("qty") as string, 10);
   if (!qty || qty < 1) throw new Error("Количество должно быть больше 0.");
@@ -130,7 +145,7 @@ export async function quickPrihod(skuId: string, formData: FormData) {
       skuId,
       qty,
       date: new Date(date),
-      userId: userId as string,
+      userId,
       note: note || undefined,
     },
   });
@@ -141,11 +156,9 @@ export async function quickPrihod(skuId: string, formData: FormData) {
 }
 
 export async function quickOtgruzka(skuId: string, formData: FormData) {
-  const { auth } = await import("@/lib/auth");
-  const { redirect } = await import("next/navigation");
   const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) redirect("/login");
+  if (!session?.user?.id) redirect("/login");
+  const userId = session.user.id;
 
   const qty = parseInt(formData.get("qty") as string, 10);
   if (!qty || qty < 1) throw new Error("Количество должно быть больше 0.");
@@ -153,15 +166,12 @@ export async function quickOtgruzka(skuId: string, formData: FormData) {
   const date = formData.get("date") as string;
   const marketplace = (formData.get("marketplace") as string).trim();
   if (!marketplace) throw new Error("Выберите маркетплейс для отгрузки.");
+  if (!ALLOWED_MARKETPLACES.includes(marketplace)) {
+    throw new Error("Недопустимый маркетплейс.");
+  }
   const note = (formData.get("note") as string).trim();
 
-  const ops = await prisma.operation.findMany({
-    where: { skuId },
-    select: { type: true, qty: true },
-  });
-  const currentStock = ops.reduce((acc, op) => {
-    return op.type === "PRIHOD" ? acc + op.qty : acc - op.qty;
-  }, 0);
+  const currentStock = await getStockBalance(skuId);
   if (qty > currentStock) {
     throw new Error(`Недостаточно товара. Остаток: ${currentStock} шт.`);
   }
@@ -172,7 +182,7 @@ export async function quickOtgruzka(skuId: string, formData: FormData) {
       skuId,
       qty,
       date: new Date(date),
-      userId: userId as string,
+      userId,
       marketplace: marketplace || undefined,
       note: note || undefined,
     },
@@ -183,9 +193,26 @@ export async function quickOtgruzka(skuId: string, formData: FormData) {
   revalidatePath("/istoriya");
 }
 
+async function getStockBalance(skuId: string): Promise<number> {
+  const groups = await prisma.operation.groupBy({
+    by: ["type"],
+    where: { skuId },
+    _sum: { qty: true },
+  });
+  let stock = 0;
+  for (const g of groups) {
+    const qty = g._sum.qty ?? 0;
+    stock += g.type === "PRIHOD" ? qty : -qty;
+  }
+  return stock;
+}
+
 async function uploadImageToStorage(file: File): Promise<string> {
   if (!["image/jpeg", "image/png"].includes(file.type)) {
     throw new Error("Допустимы только форматы JPG и PNG.");
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("Размер изображения не должен превышать 5 МБ.");
   }
 
   const supabase = createServiceClient();

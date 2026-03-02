@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+const ALLOWED_MARKETPLACES = ["Wildberries", "Ozon", "Uzum Market", "Yandex Market", "Другое"];
+
 export async function createOtgruzka(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
@@ -16,16 +18,22 @@ export async function createOtgruzka(formData: FormData) {
   const date = formData.get("date") as string;
   const marketplace = (formData.get("marketplace") as string).trim();
   if (!marketplace) throw new Error("Выберите маркетплейс для отгрузки.");
+  if (!ALLOWED_MARKETPLACES.includes(marketplace)) {
+    throw new Error("Недопустимый маркетплейс.");
+  }
   const note = (formData.get("note") as string).trim();
 
-  // Check current stock balance
-  const ops = await prisma.operation.findMany({
+  // Check current stock balance via DB aggregation
+  const groups = await prisma.operation.groupBy({
+    by: ["type"],
     where: { skuId },
-    select: { type: true, qty: true },
+    _sum: { qty: true },
   });
-  const currentStock = ops.reduce((acc, op) => {
-    return op.type === "PRIHOD" ? acc + op.qty : acc - op.qty;
-  }, 0);
+  let currentStock = 0;
+  for (const g of groups) {
+    const q = g._sum.qty ?? 0;
+    currentStock += g.type === "PRIHOD" ? q : -q;
+  }
 
   if (qty > currentStock) {
     throw new Error(

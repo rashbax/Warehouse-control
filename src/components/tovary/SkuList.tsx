@@ -10,6 +10,7 @@ type Sku = {
   artikul: string;
   model: string;
   color: string;
+  honestSign: string | null;
   imageUrl: string | null;
   note: string | null;
 };
@@ -116,6 +117,7 @@ export default function SkuList({ skus }: { skus: Sku[] }) {
                   <th className="px-4 py-3 font-semibold text-slate-600">Артикул</th>
                   <th className="px-4 py-3 font-semibold text-slate-600">Модель</th>
                   <th className="px-4 py-3 font-semibold text-slate-600">Цвет</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Честный знак</th>
                   <th className="px-4 py-3 font-semibold text-slate-600">Примечание</th>
                   <th className="px-4 py-3 font-semibold text-slate-600 w-24 text-right">Действия</th>
                 </tr>
@@ -149,6 +151,7 @@ export default function SkuList({ skus }: { skus: Sku[] }) {
                     <td className="px-4 py-3 font-mono font-medium text-slate-800">{sku.artikul}</td>
                     <td className="px-4 py-3 text-slate-700">{sku.model}</td>
                     <td className="px-4 py-3 text-slate-700">{sku.color}</td>
+                    <td className="px-4 py-3 text-slate-500 font-mono text-xs max-w-50 truncate">{sku.honestSign ?? "—"}</td>
                     <td className="px-4 py-3 text-slate-500 max-w-xs truncate">{sku.note ?? "—"}</td>
                     <td className="px-4 py-3 text-right">
                       <button
@@ -213,6 +216,17 @@ export default function SkuList({ skus }: { skus: Sku[] }) {
                   required
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Например: Чёрный"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Честный знак
+                </label>
+                <input
+                  name="honestSign"
+                  defaultValue={modal.mode === "edit" ? (modal.sku.honestSign ?? "") : ""}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Код маркировки (необязательно)"
                 />
               </div>
               <div>

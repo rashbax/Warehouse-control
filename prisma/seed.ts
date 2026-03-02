@@ -12,14 +12,20 @@ async function main() {
   console.log("Seeding database...");
 
   // Create admin user
-  const passwordHash = await bcrypt.hash("admin123", 12);
+  const passwordHash = await bcrypt.hash("123456n", 12);
+
+  // Migrate old admin email if it still exists
+  await prisma.user.updateMany({
+    where: { email: "admin@warehouse.ru" },
+    data: { email: "mysklad@warehouse.com", passwordHash },
+  });
 
   const admin = await prisma.user.upsert({
-    where: { email: "admin@warehouse.ru" },
-    update: {},
+    where: { email: "mysklad@warehouse.com" },
+    update: { passwordHash },
     create: {
       name: "Администратор",
-      email: "admin@warehouse.ru",
+      email: "mysklad@warehouse.com",
       passwordHash,
     },
   });
@@ -72,7 +78,7 @@ async function main() {
   });
 
   console.log("Created test operations");
-  console.log("\nDone! Login: admin@warehouse.ru / admin123");
+  console.log("\nDone! Login: mysklad@warehouse.com / 123456n");
 }
 
 main()

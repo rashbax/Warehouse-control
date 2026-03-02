@@ -26,8 +26,14 @@ function formatDate(iso: string) {
 export default function IstoriyaTable({ rows }: { rows: Row[] }) {
   const [skuSearch, setSkuSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "PRIHOD" | "OTGRUZKA">("ALL");
+  const [marketplaceFilter, setMarketplaceFilter] = useState("ALL");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+
+  const marketplaces = useMemo(
+    () => [...new Set(rows.map((r) => r.marketplace).filter(Boolean))] as string[],
+    [rows]
+  );
 
   const filtered = useMemo(() => {
     const q = skuSearch.toLowerCase();
@@ -36,19 +42,21 @@ export default function IstoriyaTable({ rows }: { rows: Row[] }) {
 
     return rows.filter((row) => {
       if (typeFilter !== "ALL" && row.type !== typeFilter) return false;
+      if (marketplaceFilter !== "ALL" && row.marketplace !== marketplaceFilter) return false;
       if (q && !row.artikul.toLowerCase().includes(q) && !row.model.toLowerCase().includes(q)) return false;
       const d = new Date(row.date);
       if (from && d < from) return false;
       if (to && d > to) return false;
       return true;
     });
-  }, [rows, skuSearch, typeFilter, dateFrom, dateTo]);
+  }, [rows, skuSearch, typeFilter, marketplaceFilter, dateFrom, dateTo]);
 
-  const hasFilters = skuSearch || typeFilter !== "ALL" || dateFrom || dateTo;
+  const hasFilters = skuSearch || typeFilter !== "ALL" || marketplaceFilter !== "ALL" || dateFrom || dateTo;
 
   function clearFilters() {
     setSkuSearch("");
     setTypeFilter("ALL");
+    setMarketplaceFilter("ALL");
     setDateFrom("");
     setDateTo("");
   }
@@ -101,6 +109,20 @@ export default function IstoriyaTable({ rows }: { rows: Row[] }) {
             className="px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
           />
         </div>
+
+        {/* Marketplace */}
+        {marketplaces.length > 0 && (
+          <select
+            value={marketplaceFilter}
+            onChange={(e) => setMarketplaceFilter(e.target.value)}
+            className="px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            <option value="ALL">Все маркетплейсы</option>
+            {marketplaces.map((mp) => (
+              <option key={mp} value={mp}>{mp}</option>
+            ))}
+          </select>
+        )}
 
         {/* Operation type */}
         <div className="flex rounded-lg border border-slate-300 overflow-hidden bg-white text-sm">
