@@ -115,7 +115,8 @@ export async function quickPrihod(skuId: string, formData: FormData) {
   const { auth } = await import("@/lib/auth");
   const { redirect } = await import("next/navigation");
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  const userId = session?.user?.id;
+  if (!userId) redirect("/login");
 
   const qty = parseInt(formData.get("qty") as string, 10);
   if (!qty || qty < 1) throw new Error("Количество должно быть больше 0.");
@@ -129,7 +130,7 @@ export async function quickPrihod(skuId: string, formData: FormData) {
       skuId,
       qty,
       date: new Date(date),
-      userId: session.user.id,
+      userId: userId as string,
       note: note || undefined,
     },
   });
@@ -143,7 +144,8 @@ export async function quickOtgruzka(skuId: string, formData: FormData) {
   const { auth } = await import("@/lib/auth");
   const { redirect } = await import("next/navigation");
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  const userId = session?.user?.id;
+  if (!userId) redirect("/login");
 
   const qty = parseInt(formData.get("qty") as string, 10);
   if (!qty || qty < 1) throw new Error("Количество должно быть больше 0.");
@@ -170,7 +172,7 @@ export async function quickOtgruzka(skuId: string, formData: FormData) {
       skuId,
       qty,
       date: new Date(date),
-      userId: session.user.id,
+      userId: userId as string,
       marketplace: marketplace || undefined,
       note: note || undefined,
     },
