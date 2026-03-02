@@ -1,0 +1,50 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String      @id @default(cuid())
+  name         String
+  email        String      @unique
+  passwordHash String
+  createdAt    DateTime    @default(now())
+  operations   Operation[]
+}
+
+model SKU {
+  id         String      @id @default(cuid())
+  artikul    String      @unique
+  model      String
+  color      String
+  imageUrl   String?
+  note       String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  operations Operation[]
+}
+
+model Operation {
+  id          String   @id @default(cuid())
+  type        OpType
+  skuId       String
+  sku         SKU      @relation(fields: [skuId], references: [id])
+  qty         Int
+  marketplace String?
+  note        String?
+  date        DateTime
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+enum OpType {
+  PRIHOD
+  OTGRUZKA
+}
