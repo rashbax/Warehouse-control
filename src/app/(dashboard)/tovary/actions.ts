@@ -14,8 +14,17 @@ export async function createSku(formData: FormData) {
   const artikul = (formData.get("artikul") as string).trim();
   const model = (formData.get("model") as string).trim();
   const color = (formData.get("color") as string).trim();
-  const honestSign = (formData.get("honestSign") as string)?.trim() || "";
-  const note = (formData.get("note") as string).trim();
+  const marketplace = (formData.get("marketplace") as string)?.trim() || "";
+  if (!artikul) throw new Error("Заполните артикул.");
+  if (!model) throw new Error("Заполните модель.");
+  if (!color) throw new Error("Заполните цвет.");
+  if (!marketplace || !ALLOWED_MARKETPLACES.includes(marketplace)) {
+    throw new Error("Выберите маркетплейс.");
+  }
+  const costPriceRaw = formData.get("costPrice") as string;
+  if (!costPriceRaw) throw new Error("Заполните себестоимость.");
+  const costPrice = parseFloat(costPriceRaw);
+  if (isNaN(costPrice) || costPrice < 0) throw new Error("Себестоимость должна быть числом >= 0.");
   const imageFile = formData.get("image") as File | null;
 
   let imageUrl: string | undefined;
@@ -29,8 +38,8 @@ export async function createSku(formData: FormData) {
         artikul,
         model,
         color,
-        honestSign: honestSign || undefined,
-        note: note || undefined,
+        marketplace,
+        costPrice,
         imageUrl,
       },
     });
@@ -50,8 +59,16 @@ export async function updateSku(id: string, formData: FormData) {
 
   const model = (formData.get("model") as string).trim();
   const color = (formData.get("color") as string).trim();
-  const honestSign = (formData.get("honestSign") as string)?.trim() || "";
-  const note = (formData.get("note") as string).trim();
+  const marketplace = (formData.get("marketplace") as string)?.trim() || "";
+  if (!model) throw new Error("Заполните модель.");
+  if (!color) throw new Error("Заполните цвет.");
+  if (!marketplace || !ALLOWED_MARKETPLACES.includes(marketplace)) {
+    throw new Error("Выберите маркетплейс.");
+  }
+  const costPriceRaw = formData.get("costPrice") as string;
+  if (!costPriceRaw) throw new Error("Заполните себестоимость.");
+  const costPrice = parseFloat(costPriceRaw);
+  if (isNaN(costPrice) || costPrice < 0) throw new Error("Себестоимость должна быть числом >= 0.");
   const imageFile = formData.get("image") as File | null;
 
   let imageUrl: string | undefined;
@@ -64,8 +81,8 @@ export async function updateSku(id: string, formData: FormData) {
     data: {
       model,
       color,
-      honestSign: honestSign || null,
-      note: note || undefined,
+      marketplace,
+      costPrice,
       ...(imageUrl ? { imageUrl } : {}),
     },
   });
@@ -85,126 +102,6 @@ export async function deleteSku(id: string) {
   revalidatePath("/tovary");
   revalidatePath("/ostatki");
   revalidatePath("/istoriya");
-}
-
-export async function getSkuDetails(id: string) {
-  const sku = await prisma.sKU.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      artikul: true,
-      model: true,
-      color: true,
-      honestSign: true,
-      imageUrl: true,
-      note: true,
-      operations: {
-        orderBy: { date: "desc" },
-        take: 20,
-        select: {
-          id: true,
-          type: true,
-          qty: true,
-          marketplace: true,
-          note: true,
-          date: true,
-          user: { select: { name: true } },
-        },
-      },
-    },
-  });
-  if (!sku) throw new Error("SKU не найден");
-
-  const stock = await getStockBalance(id);
-
-  return {
-    ...sku,
-    stock,
-    operations: sku.operations.map((op) => ({
-      ...op,
-      date: op.date.toISOString(),
-      userName: op.user.name,
-    })),
-  };
-}
-
-export async function quickPrihod(skuId: string, formData: FormData) {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-  const userId = session.user.id;
-
-  const qty = parseInt(formData.get("qty") as string, 10);
-  if (!qty || qty < 1) throw new Error("Количество должно быть больше 0.");
-
-  const date = formData.get("date") as string;
-  const note = (formData.get("note") as string).trim();
-
-  await prisma.operation.create({
-    data: {
-      type: "PRIHOD",
-      skuId,
-      qty,
-      date: new Date(date),
-      userId,
-      note: note || undefined,
-    },
-  });
-
-  revalidatePath("/tovary");
-  revalidatePath("/ostatki");
-  revalidatePath("/istoriya");
-}
-
-export async function quickOtgruzka(skuId: string, formData: FormData) {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-  const userId = session.user.id;
-
-  const qty = parseInt(formData.get("qty") as string, 10);
-  if (!qty || qty < 1) throw new Error("Количество должно быть больше 0.");
-
-  const date = formData.get("date") as string;
-  const marketplace = (formData.get("marketplace") as string).trim();
-  if (!marketplace) throw new Error("Выберите маркетплейс для отгрузки.");
-  if (!ALLOWED_MARKETPLACES.includes(marketplace)) {
-    throw new Error("Недопустимый маркетплейс.");
-  }
-  const note = (formData.get("note") as string).trim();
-
-  const currentStock = await getStockBalance(skuId);
-  if (qty > currentStock) {
-    throw new Error(`Недостаточно товара. Остаток: ${currentStock} шт.`);
-  }
-
-  await prisma.operation.create({
-    data: {
-      type: "OTGRUZKA",
-      skuId,
-      qty,
-      date: new Date(date),
-      userId,
-      marketplace: marketplace || undefined,
-      note: note || undefined,
-    },
-  });
-
-  revalidatePath("/tovary");
-  revalidatePath("/ostatki");
-  revalidatePath("/istoriya");
-}
-
-async function getStockBalance(skuId: string): Promise<number> {
-  const groups = await prisma.operation.groupBy({
-    by: ["type"],
-    where: { skuId },
-    _sum: { qty: true },
-  });
-  let stock = 0;
-  for (const g of groups) {
-    const qty = g._sum.qty ?? 0;
-    stock += g.type === "PRIHOD" ? qty : -qty;
-  }
-  return stock;
 }
 
 async function uploadImageToStorage(file: File): Promise<string> {

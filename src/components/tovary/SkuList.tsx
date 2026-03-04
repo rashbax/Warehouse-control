@@ -3,16 +3,17 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createSku, updateSku, deleteSku } from "@/app/(dashboard)/tovary/actions";
-import SkuDrawer from "./SkuDrawer";
+
+const MARKETPLACES = ["Wildberries", "Ozon", "Uzum Market", "Yandex Market", "Другое"];
 
 type Sku = {
   id: string;
   artikul: string;
   model: string;
   color: string;
-  honestSign: string | null;
+  marketplace: string | null;
+  costPrice: number;
   imageUrl: string | null;
-  note: string | null;
 };
 
 export default function SkuList({ skus }: { skus: Sku[] }) {
@@ -32,7 +33,7 @@ export default function SkuList({ skus }: { skus: Sku[] }) {
     return () => clearTimeout(t);
   }, [highlightId, router]);
 
-  const [drawerSkuId, setDrawerSkuId] = useState<string | null>(null);
+  const [filterMarketplace, setFilterMarketplace] = useState("");
   const [isPending, startTransition] = useTransition();
   const [modal, setModal] = useState<{ mode: "add" } | { mode: "edit"; sku: Sku } | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -85,7 +86,7 @@ export default function SkuList({ skus }: { skus: Sku[] }) {
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-slate-900">Товары (SKU)</h1>
         <button
           onClick={openAdd}
@@ -96,6 +97,25 @@ export default function SkuList({ skus }: { skus: Sku[] }) {
           </svg>
           Добавить товар
         </button>
+      </div>
+
+      {/* Marketplace filter */}
+      <div className="flex items-center gap-3 mb-4">
+        <select
+          value={filterMarketplace}
+          onChange={(e) => setFilterMarketplace(e.target.value)}
+          className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+        >
+          <option value="">Все маркетплейсы</option>
+          {MARKETPLACES.map((mp) => (
+            <option key={mp} value={mp}>{mp}</option>
+          ))}
+        </select>
+        <span className="text-sm text-slate-500">
+          {filterMarketplace
+            ? `${skus.filter((s) => s.marketplace === filterMarketplace).length} из ${skus.length}`
+            : `${skus.length} товаров`}
+        </span>
       </div>
 
       {/* Table */}
@@ -117,13 +137,13 @@ export default function SkuList({ skus }: { skus: Sku[] }) {
                   <th className="px-4 py-3 font-semibold text-slate-600">Артикул</th>
                   <th className="px-4 py-3 font-semibold text-slate-600">Модель</th>
                   <th className="px-4 py-3 font-semibold text-slate-600">Цвет</th>
-                  <th className="px-4 py-3 font-semibold text-slate-600">Честный знак</th>
-                  <th className="px-4 py-3 font-semibold text-slate-600">Примечание</th>
-                  <th className="px-4 py-3 font-semibold text-slate-600 w-24 text-right">Действия</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Маркетплейс</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Себестоимость</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600 w-24 text-right"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {skus.map((sku) => (
+                {skus.filter((s) => !filterMarketplace || s.marketplace === filterMarketplace).map((sku) => (
                   <tr
                     key={sku.id}
                     ref={sku.id === highlightId ? highlightRef : undefined}
@@ -148,21 +168,34 @@ export default function SkuList({ skus }: { skus: Sku[] }) {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-mono font-medium text-slate-800">{sku.artikul}</td>
+                    <td className="px-4 py-3 font-mono font-medium text-slate-800 [font-variant-numeric:slashed-zero]">{sku.artikul}</td>
                     <td className="px-4 py-3 text-slate-700">{sku.model}</td>
                     <td className="px-4 py-3 text-slate-700">{sku.color}</td>
-                    <td className="px-4 py-3 text-slate-500 font-mono text-xs max-w-50 truncate">{sku.honestSign ?? "—"}</td>
-                    <td className="px-4 py-3 text-slate-500 max-w-xs truncate">{sku.note ?? "—"}</td>
+                    <td className="px-4 py-3 text-slate-600">{sku.marketplace ?? "—"}</td>
+                    <td className="px-4 py-3 text-slate-600">{sku.costPrice} ₽</td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => setDrawerSkuId(sku.id)}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                        title="Открыть карточку"
-                      >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                          <circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" />
-                        </svg>
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Edit button */}
+                        <button
+                          onClick={() => openEdit(sku)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Редактировать"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        {/* Delete button */}
+                        <button
+                          onClick={() => setDeleteId(sku.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Удалить"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -183,6 +216,20 @@ export default function SkuList({ skus }: { skus: Sku[] }) {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Маркетплейс *
+                </label>
+                <select
+                  name="marketplace"
+                  required
+                  defaultValue={modal.mode === "edit" ? (modal.sku.marketplace ?? "") : ""}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="" disabled>— Выберите —</option>
+                  {MARKETPLACES.map((mp) => <option key={mp} value={mp}>{mp}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Артикул *
                 </label>
                 <input
@@ -190,7 +237,7 @@ export default function SkuList({ skus }: { skus: Sku[] }) {
                   defaultValue={modal.mode === "edit" ? modal.sku.artikul : ""}
                   disabled={modal.mode === "edit"}
                   required
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500 [font-variant-numeric:slashed-zero]"
                   placeholder="Например: WB-001"
                 />
               </div>
@@ -220,25 +267,17 @@ export default function SkuList({ skus }: { skus: Sku[] }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Честный знак
+                  Себестоимость (₽) *
                 </label>
                 <input
-                  name="honestSign"
-                  defaultValue={modal.mode === "edit" ? (modal.sku.honestSign ?? "") : ""}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Код маркировки (необязательно)"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Примечание
-                </label>
-                <textarea
-                  name="note"
-                  defaultValue={modal.mode === "edit" ? (modal.sku.note ?? "") : ""}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  placeholder="Необязательно"
+                  name="costPrice"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  defaultValue={modal.mode === "edit" ? modal.sku.costPrice : ""}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -323,19 +362,6 @@ export default function SkuList({ skus }: { skus: Sku[] }) {
         </div>
       )}
 
-      {/* SKU Drawer */}
-      <SkuDrawer
-        skuId={drawerSkuId}
-        onClose={() => setDrawerSkuId(null)}
-        onEditClick={() => {
-          const sku = skus.find((s) => s.id === drawerSkuId);
-          if (sku) { setDrawerSkuId(null); openEdit(sku); }
-        }}
-        onDeleteClick={() => {
-          const id = drawerSkuId;
-          if (id) { setDrawerSkuId(null); setDeleteId(id); }
-        }}
-      />
     </>
   );
 }

@@ -9,9 +9,9 @@ export default async function TovaryPage() {
       artikul: true,
       model: true,
       color: true,
-      honestSign: true,
+      marketplace: true,
+      costPrice: true,
       imageUrl: true,
-      note: true,
     },
   });
 

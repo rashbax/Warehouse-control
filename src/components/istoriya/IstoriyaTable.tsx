@@ -7,12 +7,14 @@ type Row = {
   type: "PRIHOD" | "OTGRUZKA";
   qty: number;
   marketplace: string | null;
+  chestnyZnak: string | null;
   note: string | null;
   date: string;
   artikul: string;
   model: string;
   color: string;
   userName: string | null;
+  userRole: string | null;
 };
 
 function formatDate(iso: string) {
@@ -177,6 +179,7 @@ export default function IstoriyaTable({ rows }: { rows: Row[] }) {
                   <th className="px-4 py-3 font-semibold text-slate-600">Модель / Цвет</th>
                   <th className="px-4 py-3 font-semibold text-slate-600 text-right">Кол-во</th>
                   <th className="px-4 py-3 font-semibold text-slate-600">Маркетплейс</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Честный знак</th>
                   <th className="px-4 py-3 font-semibold text-slate-600">Примечание</th>
                   <th className="px-4 py-3 font-semibold text-slate-600">Пользователь</th>
                 </tr>
@@ -198,7 +201,7 @@ export default function IstoriyaTable({ rows }: { rows: Row[] }) {
                         {row.type === "PRIHOD" ? "Приход" : "Отгрузка"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-mono font-medium text-slate-800">
+                    <td className="px-4 py-3 font-mono font-medium text-slate-800 [font-variant-numeric:slashed-zero]">
                       {row.artikul}
                     </td>
                     <td className="px-4 py-3 text-slate-700">
@@ -209,6 +212,9 @@ export default function IstoriyaTable({ rows }: { rows: Row[] }) {
                     </td>
                     <td className="px-4 py-3 text-slate-500">
                       {row.marketplace ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 font-mono text-xs">
+                      {row.chestnyZnak ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-slate-500 max-w-xs truncate">
                       {row.note ?? "—"}

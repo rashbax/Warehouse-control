@@ -14,21 +14,22 @@ model User {
   name         String
   email        String      @unique
   passwordHash String
+  role         UserRole    @default(ADMIN)
   createdAt    DateTime    @default(now())
   operations   Operation[]
 }
 
 model SKU {
-  id         String      @id @default(cuid())
-  artikul    String      @unique
-  model      String
-  color      String
-  honestSign String?
-  imageUrl   String?
-  note       String?
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  operations Operation[]
+  id          String      @id @default(cuid())
+  artikul     String      @unique
+  model       String
+  color       String
+  marketplace String      @default("")
+  costPrice   Float       @default(0)
+  imageUrl    String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  operations  Operation[]
 }
 
 model Operation {
@@ -38,6 +39,7 @@ model Operation {
   sku         SKU      @relation(fields: [skuId], references: [id], onDelete: Cascade)
   qty         Int
   marketplace String?
+  chestnyZnak String?
   note        String?
   date        DateTime
   userId      String
@@ -47,9 +49,16 @@ model Operation {
   @@index([skuId])
   @@index([date])
   @@index([skuId, type])
+  @@index([chestnyZnak])
 }
 
 enum OpType {
   PRIHOD
   OTGRUZKA
+}
+
+enum UserRole {
+  ADMIN
+  WAREHOUSE_MANAGER
+  MARKETPLACE_MANAGER
 }

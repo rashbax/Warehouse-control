@@ -21,12 +21,14 @@ export async function createOtgruzka(formData: FormData) {
   if (!ALLOWED_MARKETPLACES.includes(marketplace)) {
     throw new Error("Недопустимый маркетплейс.");
   }
+  const chestnyZnak = (formData.get("chestnyZnak") as string | null)?.trim();
+  if (!chestnyZnak) throw new Error("Укажите Честный знак.");
   const note = (formData.get("note") as string).trim();
 
-  // Check current stock balance via DB aggregation
+  // Check stock for this specific Честный знак
   const groups = await prisma.operation.groupBy({
     by: ["type"],
-    where: { skuId },
+    where: { skuId, chestnyZnak },
     _sum: { qty: true },
   });
   let currentStock = 0;
@@ -34,10 +36,9 @@ export async function createOtgruzka(formData: FormData) {
     const q = g._sum.qty ?? 0;
     currentStock += g.type === "PRIHOD" ? q : -q;
   }
-
   if (qty > currentStock) {
     throw new Error(
-      `Недостаточно товара на складе. Остаток: ${currentStock} шт., запрошено: ${qty} шт.`
+      `Недостаточно товара на складе. Остаток по коду «${chestnyZnak}»: ${currentStock} шт., запрошено: ${qty} шт.`
     );
   }
 
@@ -49,6 +50,7 @@ export async function createOtgruzka(formData: FormData) {
       date: new Date(date),
       userId: session.user.id,
       marketplace: marketplace || undefined,
+      chestnyZnak,
       note: note || undefined,
     },
   });
