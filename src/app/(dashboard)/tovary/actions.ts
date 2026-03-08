@@ -8,100 +8,106 @@ import { redirect } from "next/navigation";
 
 const ALLOWED_MARKETPLACES = ["Wildberries", "Ozon", "Uzum Market", "Yandex Market", "Другое"];
 
-export async function createSku(formData: FormData) {
+export async function createSku(formData: FormData): Promise<{ error?: string }> {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const artikul = (formData.get("artikul") as string).trim();
   const model = (formData.get("model") as string).trim();
   const color = (formData.get("color") as string).trim();
   const marketplace = (formData.get("marketplace") as string)?.trim() || "";
-  if (!artikul) throw new Error("Заполните артикул.");
-  if (!model) throw new Error("Заполните модель.");
-  if (!color) throw new Error("Заполните цвет.");
+  if (!artikul) return { error: "Заполните артикул." };
+  if (!model) return { error: "Заполните модель." };
+  if (!color) return { error: "Заполните цвет." };
   if (!marketplace || !ALLOWED_MARKETPLACES.includes(marketplace)) {
-    throw new Error("Выберите маркетплейс.");
+    return { error: "Выберите маркетплейс." };
   }
   const costPriceRaw = formData.get("costPrice") as string;
-  if (!costPriceRaw) throw new Error("Заполните себестоимость.");
+  if (!costPriceRaw) return { error: "Заполните себестоимость." };
   const costPrice = parseFloat(costPriceRaw);
-  if (isNaN(costPrice) || costPrice < 0) throw new Error("Себестоимость должна быть числом >= 0.");
+  if (isNaN(costPrice) || costPrice < 0) return { error: "Себестоимость должна быть числом >= 0." };
   const imageFile = formData.get("image") as File | null;
 
   let imageUrl: string | undefined;
   if (imageFile && imageFile.size > 0) {
-    imageUrl = await uploadImageToStorage(imageFile);
+    try {
+      imageUrl = await uploadImageToStorage(imageFile);
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Ошибка загрузки изображения." };
+    }
   }
 
   try {
     await prisma.sKU.create({
-      data: {
-        artikul,
-        model,
-        color,
-        marketplace,
-        costPrice,
-        imageUrl,
-      },
+      data: { artikul, model, color, marketplace, costPrice, imageUrl },
     });
   } catch (err: unknown) {
     if ((err as { code?: string }).code === "P2002") {
-      throw new Error(`Артикул «${artikul}» уже существует. Выберите другой.`);
+      return { error: `Артикул «${artikul}» уже существует. Выберите другой.` };
     }
-    throw err;
+    return { error: "Ошибка при создании товара." };
   }
 
   revalidatePath("/tovary");
+  return {};
 }
 
-export async function updateSku(id: string, formData: FormData) {
+export async function updateSku(id: string, formData: FormData): Promise<{ error?: string }> {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
   const model = (formData.get("model") as string).trim();
   const color = (formData.get("color") as string).trim();
   const marketplace = (formData.get("marketplace") as string)?.trim() || "";
-  if (!model) throw new Error("Заполните модель.");
-  if (!color) throw new Error("Заполните цвет.");
+  if (!model) return { error: "Заполните модель." };
+  if (!color) return { error: "Заполните цвет." };
   if (!marketplace || !ALLOWED_MARKETPLACES.includes(marketplace)) {
-    throw new Error("Выберите маркетплейс.");
+    return { error: "Выберите маркетплейс." };
   }
   const costPriceRaw = formData.get("costPrice") as string;
-  if (!costPriceRaw) throw new Error("Заполните себестоимость.");
+  if (!costPriceRaw) return { error: "Заполните себестоимость." };
   const costPrice = parseFloat(costPriceRaw);
-  if (isNaN(costPrice) || costPrice < 0) throw new Error("Себестоимость должна быть числом >= 0.");
+  if (isNaN(costPrice) || costPrice < 0) return { error: "Себестоимость должна быть числом >= 0." };
   const imageFile = formData.get("image") as File | null;
 
   let imageUrl: string | undefined;
   if (imageFile && imageFile.size > 0) {
-    imageUrl = await uploadImageToStorage(imageFile);
+    try {
+      imageUrl = await uploadImageToStorage(imageFile);
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Ошибка загрузки изображения." };
+    }
   }
 
-  await prisma.sKU.update({
-    where: { id },
-    data: {
-      model,
-      color,
-      marketplace,
-      costPrice,
-      ...(imageUrl ? { imageUrl } : {}),
-    },
-  });
+  try {
+    await prisma.sKU.update({
+      where: { id },
+      data: { model, color, marketplace, costPrice, ...(imageUrl ? { imageUrl } : {}) },
+    });
+  } catch {
+    return { error: "Ошибка при обновлении товара." };
+  }
 
   revalidatePath("/tovary");
+  return {};
 }
 
-export async function deleteSku(id: string) {
+export async function deleteSku(id: string): Promise<{ error?: string }> {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  await prisma.$transaction([
-    prisma.operation.deleteMany({ where: { skuId: id } }),
-    prisma.sKU.delete({ where: { id } }),
-  ]);
+  try {
+    await prisma.$transaction([
+      prisma.operation.deleteMany({ where: { skuId: id } }),
+      prisma.sKU.delete({ where: { id } }),
+    ]);
+  } catch {
+    return { error: "Ошибка при удалении товара." };
+  }
 
   revalidatePath("/tovary");
   revalidatePath("/ostatki");
   revalidatePath("/istoriya");
+  return {};
 }
 
 async function uploadImageToStorage(file: File): Promise<string> {
@@ -122,7 +128,7 @@ async function uploadImageToStorage(file: File): Promise<string> {
     .from(STORAGE_BUCKET)
     .upload(fileName, buffer, { contentType: file.type });
 
-  if (error) throw new Error(`Image upload failed: ${error.message}`);
+  if (error) throw new Error(`Ошибка загрузки: ${error.message}`);
 
   const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(fileName);
   return data.publicUrl;

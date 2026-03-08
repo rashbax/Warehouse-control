@@ -63,23 +63,25 @@ export default function SkuList({ skus }: { skus: Sku[] }) {
     const fd = new FormData(e.currentTarget);
     setError(null);
     startTransition(async () => {
-      try {
-        if (modal!.mode === "add") {
-          await createSku(fd);
-        } else {
-          await updateSku((modal as { mode: "edit"; sku: Sku }).sku.id, fd);
-        }
+      const result = modal!.mode === "add"
+        ? await createSku(fd)
+        : await updateSku((modal as { mode: "edit"; sku: Sku }).sku.id, fd);
+      if (result.error) {
+        setError(result.error);
+      } else {
         closeModal();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Ошибка при сохранении.");
       }
     });
   }
 
   function handleDelete(id: string) {
     startTransition(async () => {
-      await deleteSku(id);
-      setDeleteId(null);
+      const result = await deleteSku(id);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setDeleteId(null);
+      }
     });
   }
 

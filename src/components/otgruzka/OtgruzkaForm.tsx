@@ -27,14 +27,14 @@ export default function OtgruzkaForm({ skus }: { skus: Sku[] }) {
     setSuccess(false);
 
     startTransition(async () => {
-      try {
-        await createOtgruzka(fd);
+      const result = await createOtgruzka(fd);
+      if (result.error) {
+        setError(result.error);
+      } else {
         form.reset();
         setSelectedMarketplace("");
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Ошибка при сохранении.");
       }
     });
   }

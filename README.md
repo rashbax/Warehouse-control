@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Warehouse Control
+
+Internal warehouse inventory management system for marketplace sellers. Tracks stock movements, shipments, and product marking (Честный знак) across multiple marketplaces.
+
+## Features
+
+- **Stock Overview** — real-time stock balances computed from operations, filterable by marketplace
+- **SKU Management** — product catalog with images, cost prices, and marketplace assignment
+- **Receiving (Приход)** — record incoming stock with Честный знак codes
+- **Shipments (Отгрузка)** — record outgoing shipments with per-code stock validation
+- **Audit Log (История)** — full operation history with filters by type, marketplace, and date range
+- **Marketplaces** — Wildberries, Ozon, Uzum Market, Yandex Market, Другое
+- **Authentication** — session-based auth with role support (Admin, Warehouse Manager, Marketplace Manager)
+
+## Tech Stack
+
+| Layer     | Technology                        |
+| --------- | --------------------------------- |
+| Framework | Next.js 16 (App Router)           |
+| Language  | TypeScript                        |
+| UI        | React 19, Tailwind CSS v4         |
+| Database  | PostgreSQL (Supabase)             |
+| ORM       | Prisma 7                          |
+| Auth      | NextAuth v5                       |
+| Storage   | Supabase Storage (product images) |
+| Hosting   | Vercel                            |
+
+## Database Schema
+
+```
+User          — id, name, email, passwordHash, role
+SKU           — id, artikul, model, color, marketplace, costPrice, imageUrl
+Operation     — id, type (PRIHOD|OTGRUZKA), skuId, qty, marketplace, chestnyZnak, note, date, userId
+```
+
+Stock balance is computed — no separate stock field. Balance = SUM(PRIHOD) - SUM(OTGRUZKA), grouped per SKU and Честный знак code.
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL database (or Supabase project)
+
+### Setup
 
 ```bash
+# Install dependencies
+npm install
+
+# Configure environment
+cp .env.example .env.local
+# Fill in DATABASE_URL, DIRECT_URL, NEXTAUTH_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+
+# Generate Prisma client
+npm run db:generate
+
+# Run migrations
+npx prisma migrate deploy
+
+# Seed initial data
+npm run db:seed
+
+# Start dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to access the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command               | Description              |
+| --------------------- | ------------------------ |
+| `npm run dev`         | Start development server |
+| `npm run build`       | Production build         |
+| `npm run start`       | Start production server  |
+| `npm run db:generate` | Generate Prisma client   |
+| `npm run db:migrate`  | Run migrations (dev)     |
+| `npm run db:push`     | Push schema to database  |
+| `npm run db:seed`     | Seed database            |
+| `npm run db:studio`   | Open Prisma Studio       |
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── app/
+│   ├── (dashboard)/
+│   │   ├── ostatki/       # Stock balances page
+│   │   ├── tovary/        # SKU management page
+│   │   ├── prihod/        # Receiving form
+│   │   ├── otgruzka/      # Shipment form
+│   │   └── istoriya/      # Audit log
+│   └── login/             # Authentication
+├── components/            # UI components per route
+└── lib/                   # Prisma client, auth config, Supabase client
+prisma/
+├── schema.prisma          # Database schema
+├── migrations/            # Migration history
+└── seed.ts                # Seed data
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Deployed on Vercel with Supabase as the database provider. Push to `master` triggers automatic deployment.
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Private — internal use only.
