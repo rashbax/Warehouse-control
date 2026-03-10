@@ -85,6 +85,8 @@ export default function OstatkiTable({ rows }: { rows: Row[] }) {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Остатки</h1>
           <p className="text-sm text-slate-500 mt-0.5">
+            Всего: <span className="font-semibold text-slate-700">{filtered.reduce((sum, r) => sum + r.stock, 0).toLocaleString("ru-RU")} шт.</span>
+            {" · "}
             Общая сумма:{" "}
             <span className="font-semibold text-slate-700">
               {filtered.reduce((sum, r) => sum + r.stock * r.costPrice, 0).toLocaleString("ru-RU")} ₽
